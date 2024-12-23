@@ -1,0 +1,20 @@
+<nav>
+    <div class="navbar">
+        <div class="logo">What am I gonna eat today?</div>
+        <div class="menu">
+            {% if current_user.is_authenticated %}
+
+            <a href="{{ url_for('logout') }}">Abmelden</a>
+            <a href="{{ url_for('add_dish') }}">Gericht hinzufügen</a>
+            <a href="{{ url_for('weekly_dishes_form') }}">Essensplan erstellen</a>
+            <a href="{{ url_for('all_dishes') }}">Gerichte Verwalten</a>
+
+            {% else %}
+
+            <a href="{{ url_for('login') }}">Anmelden</a>
+            <a href="{{ url_for('register') }}">Registrieren</a>
+
+            {% endif %}
+        </div>
+    </div>
+</nav>

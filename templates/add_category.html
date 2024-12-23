@@ -1,0 +1,31 @@
+{% from "bootstrap5/form.html" import render_form %}
+{% include "head.html" %}
+
+<head>
+    <title>Startseite</title>
+</head>
+
+{% include "navbar.html" %}
+
+<body>
+    <div class="row justify-content-center under-navbar">
+        <div class="col-4 text-center">
+            <h2>Füge Kategorien zu {{ name }} hinzu.</h2>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            {% for message in messages %}
+            <p class="flash">{{ message }}</p>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+            <div class="col-2 text-center">
+                {{render_form(form, novalidate=True, button_map={"submit": "primary"}) }}
+            </div>
+        </div>
+    </div>
+</body>

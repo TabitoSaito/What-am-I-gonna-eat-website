@@ -1,0 +1,59 @@
+{% include "head.html" %}
+
+<head>
+    <title>Gerichte</title>
+    <script src="static/js/search.js" defer></script>
+</head>
+
+{% include "navbar.html" %}
+
+<body>
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <input type="text" id="searchBar" class="form-control" placeholder="Suche nach Gericht...">
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            {% for message in messages %}
+            {% if message %}
+                <p class="success">{{ message }}</p>
+            {% endif %}
+            {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div id="dishList">
+
+            {% if dishes == [] %}
+
+                <p>Füge ein Gericht hinzu um loszulegen.</p>
+
+            {% else %}
+
+            {% for dish in dishes %}
+
+            <div class="container dish" id="dish-{{ loop.index }}">
+                <div class="row">
+                    <div class="col-4 text-start">
+                        <a href="{{ url_for('dish', name=dish.name) }}">
+                            <p class="dish-name">{{ dish.name }}</p>
+                        </a>
+                    </div>
+                    <div class="col-3 text-start">
+                        <p>Zutaten: {{ dish.ingredient_count }}</p>
+                    </div>
+                    <div class="col-4 text-end">
+                        <p>Hinzugefügt am {{ dish.created_on }}</p>
+                    </div>
+                    <div class="col-1 text-end dish">
+                        <a href="{{ url_for('delete_dish', id=dish.id) }}">❌</a>
+                    </div>
+                </div>
+            </div>
+
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</body>
