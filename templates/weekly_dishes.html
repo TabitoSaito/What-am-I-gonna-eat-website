@@ -1,0 +1,51 @@
+{% include "head.html" %}
+
+<head>
+    <title>Essensplan</title>
+</head>
+
+{% include "navbar.html" %}
+
+<body>
+
+    <div class="row align-items-center text-center under-navbar">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for message in messages %}
+        <p class="flash">{{ message }}</p>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    {% for day, dish in food_dict.items() %}
+
+    <div class="container day-card">
+        <div class="row align-items-center">
+            <div class="col-6 text-start">
+                <h3>{{ day }}</h3>
+            </div>
+            <div class="col-6 text-end">
+                <a href="{{ url_for('replace_weekly_dish', dish_id=dish.id) }}">Neu</a>
+            </div>
+        </div>
+
+        <div class="row align-items-center card-row">
+            <div class="col-sm-9 col-md-8 col-lg-6 text-start">
+                <img alt="Food" src="{{ dish.img_url }}">
+            </div>
+            <div class="col-sm-3 col-md-4 col-lg-6 text-start">
+                <h1>{{ dish.name }}</h1>
+            </div>
+        </div>
+    </div>
+
+    {% endfor %}
+
+    <div class="row justify-content-center text-center">
+        <div class="col-9 text-end">
+            <a class="btn btn-success" href="{{ url_for('shopping_list') }}" role="button">Erstelle Einkaufsliste</a>
+        </div>
+    </div>
+
+</body>
