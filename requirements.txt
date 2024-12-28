@@ -5,4 +5,9 @@ WTForms~=3.0.1
 python-dotenv~=1.0.1
 pyperclip~=1.9.0
 fpdf~=1.7.2
-gunicorn==22.0.0
+gunicorn~=22.0.0
+Flask-Bootstrap~=3.3.7.1
+Bootstrap-Flask~=2.4.1
+Flask-SQLAlchemy~=3.1.1
+Flask-Login~=0.6.3
+Flask-WTF~=1.2.2
