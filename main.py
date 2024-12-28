@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, flash, request, send_file
 from flask_bootstrap import Bootstrap5
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -10,13 +10,17 @@ from forms import RegisterForm, LoginForm, DishForm, IngredientForm, CategoryFor
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import date
 import random
+import base64
+import json
+import pyperclip
+from fpdf import FPDF
 
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-ingredients: dict = {}
-food_dict: dict = {}
+INGREDIENTS: dict = {}
+FOOD_DICT: dict = {}
 
 TRANS_DICT = {
     "rice": "Reis",
@@ -39,6 +43,7 @@ WEEK_DICT = {
 }
 
 WEEK_DICT_INVER = {str(v): k for k, v in WEEK_DICT.items()}
+PDF_PATH = "static/assets/pdf/Einkaufsliste.pdf"
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = SECRET_KEY
@@ -120,7 +125,7 @@ def weekly_dishes_form():
     form = WeeklyForm()
 
     if form.validate_on_submit():
-        food_dict.clear()
+        FOOD_DICT.clear()
 
         start = WEEK_DICT[form.start.data]
         end = WEEK_DICT[form.end.data]
@@ -157,7 +162,7 @@ def weekly_dishes_form():
             dish_choice = random.sample(dishes, k=days)
 
             for i in range(0, days):
-                food_dict[str(i + start)] = dish_choice[i]
+                FOOD_DICT[str(i + start)] = dish_choice[i]
 
         elif days != vegetarian_days:
 
@@ -184,11 +189,11 @@ def weekly_dishes_form():
                 else:
                     cur_dish = next(iter_no_vegetarian_choices)
 
-                food_dict[str(i)] = cur_dish
+                FOOD_DICT[str(i)] = cur_dish
 
         else:
             for i in range(0, days):
-                food_dict[str(i + start)] = vegetarian_choices[i]
+                FOOD_DICT[str(i + start)] = vegetarian_choices[i]
 
         return redirect(url_for('weekly_dishes'))
 
@@ -212,7 +217,7 @@ def replace_weekly_dish():
         dishes = result.scalars().all()
         veggie = False
 
-    dishes = [item for item in dishes if item.id not in [v.id for k, v in food_dict.items()]]
+    dishes = [item for item in dishes if item.id not in [v.id for k, v in FOOD_DICT.items()]]
 
     if len(dishes) <= 0:
         if veggie:
@@ -220,9 +225,9 @@ def replace_weekly_dish():
         else:
             flash("Nicht genügend nicht vegetarische Gerichte in der Datenbank!")
     else:
-        for k, v in food_dict.items():
+        for k, v in FOOD_DICT.items():
             if v.id == dish_to_replace.id:
-                food_dict[k] = random.choice(dishes)
+                FOOD_DICT[k] = random.choice(dishes)
 
     return redirect(url_for('weekly_dishes'))
 
@@ -230,17 +235,17 @@ def replace_weekly_dish():
 @app.route("/weekly-dishes")
 def weekly_dishes():
 
-    food_dict_trans = {WEEK_DICT_INVER[k]: v for k, v in food_dict.items()}
+    food_dict_trans = {WEEK_DICT_INVER[k]: v for k, v in FOOD_DICT.items()}
 
     return render_template("weekly_dishes.html", food_dict=food_dict_trans)
 
 
-@app.route("/shopping-list")
-def shopping_list():
+@app.route("/gen-shopping-list")
+def gen_shopping_list():
     result = db.session.execute(db.select(Dish).where(Dish.author == current_user))
     dishes = result.scalars().all()
 
-    dishes: list[Dish] = [item for item in dishes if item.id in [v.id for k, v in food_dict.items()]]
+    dishes: list[Dish] = [item for item in dishes if item.id in [v.id for k, v in FOOD_DICT.items()]]
 
     ingredient_dict = {}
 
@@ -256,7 +261,73 @@ def shopping_list():
             else:
                 ingredient_dict[ingredient] = value
 
-    return render_template("shopping_list.html", ingredient_dict=ingredient_dict)
+    serialized_data = json.dumps(ingredient_dict)
+    encoded_data = base64.urlsafe_b64encode(serialized_data.encode()).decode()
+
+    return redirect(url_for("shopping_list", data=encoded_data))
+
+
+@app.route("/shopping-list")
+def shopping_list():
+    encoded_data = request.args.get("data")
+    if encoded_data:
+        try:
+            decoded_data = base64.urlsafe_b64decode(encoded_data).decode()
+            ingredient_dict = json.loads(decoded_data)
+        except Exception as e:
+            return "Ungültige oder beschädigte Daten.", 400
+
+    else:
+        return "Einkaufsliste nicht vorhanden."
+
+    return render_template("shopping_list.html", ingredient_dict=ingredient_dict, data=encoded_data)
+
+
+@app.route("/share")
+def share_shopping_list():
+    encoded_data = request.args.get("data")
+    shareable_link = f"{request.host_url}shopping-list?data={encoded_data}"
+    pyperclip.copy(shareable_link)
+    flash("Link Erfolgreich kopiert.")
+    return redirect(url_for("shopping_list", data=encoded_data))
+
+
+@app.route("/gen-pdf")
+def gen_pdf_shopping_list():
+    encoded_data = request.args.get("data")
+    if encoded_data:
+        try:
+            decoded_data = base64.urlsafe_b64decode(encoded_data).decode()
+            ingredient_dict: dict = json.loads(decoded_data)
+        except Exception as e:
+            return "Ungültige oder beschädigte Daten.", 400
+    else:
+        return "Einkaufsliste nicht vorhanden."
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=15)
+
+    line_count = 1
+
+    pdf.cell(200, 10, txt="Einkaufsliste",
+             ln=line_count, align='C')
+
+    for k, v in ingredient_dict.items():
+        line_count += 1
+
+        line = f"{k}_____________________________________________________________{v[0]} {v[1]}"
+
+        line = line.replace("_", "", len(k))
+        line = line.replace("_", "", len(str(v[0])))
+        line = line.replace("_", "", len(str(v[1])))
+
+        pdf.cell(200, 10, txt=line,
+                 ln=line_count, align='L')
+
+    pdf.output(PDF_PATH)
+
+    return send_file(PDF_PATH, as_attachment=True)
 
 
 @app.route("/dish")
@@ -283,8 +354,16 @@ def add_dish():
     if form.validate_on_submit():
         name = form.name.data
         img_url = form.img_url.data
-        ingredients.clear()
-        return redirect(url_for("add_ingredients", name=name, img_url=img_url, ingredients=ingredients))
+
+        result = db.session.execute(db.select(Dish).where(and_(Dish.name == name, Dish.author == current_user)))
+        test = result.scalars().all()
+
+        if not test:
+            INGREDIENTS.clear()
+            return redirect(url_for("add_ingredients", name=name, img_url=img_url, ingredients=INGREDIENTS))
+        else:
+            flash("Du hast schon ein Gericht mit diesem Namen.")
+            return render_template("add_dish.html", form=form)
 
     return render_template("add_dish.html", form=form)
 
@@ -300,28 +379,38 @@ def add_ingredients():
         amount = float(form.amount.data)
         unit = form.unit.data
 
-        ingredients[ingredient] = (amount, unit)
+        INGREDIENTS[ingredient.title()] = (amount, unit)
 
-        return redirect(url_for("add_ingredients", name=name, img_url=img_url, ingredients=ingredients))
+        return redirect(url_for("add_ingredients", name=name, img_url=img_url, ingredients=INGREDIENTS))
 
-    return render_template("add_ingredients.html", form=form, name=name, img_url=img_url, ingredients=ingredients)
+    return render_template("add_ingredients.html", form=form, name=name, img_url=img_url, ingredients=INGREDIENTS)
 
 
 @app.route("/add-category", methods=["GET", "POST"])
 def add_category():
+
+    if not INGREDIENTS:
+        flash("Füge mindestens eine Zutat hinzu.")
+        return redirect(url_for('add_ingredients'))
+
     form = CategoryForm()
     name = request.args.get("name")
     img_url = request.args.get("img_url")
 
     if form.validate_on_submit():
 
+        if form.vegetarian.data:
+            if form.chicken.data or form.pork.data or form.beef.data:
+                flash("Gericht kann nicht vegetarisch mit Fleisch sein!")
+                return render_template("add_category.html", form=form, name=name)
+
         new_dish = Dish(
             name=name,
             created_on=date.today().strftime("%d.%m.%Y"),
             img_url=img_url,
-            ingredients=ingredients,
+            ingredients=INGREDIENTS,
             author=current_user,
-            ingredient_count=len(ingredients),
+            ingredient_count=len(INGREDIENTS),
             rice=form.rice.data,
             noodle=form.noodle.data,
             vegetarian=form.vegetarian.data,

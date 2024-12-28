@@ -10,7 +10,7 @@
     <div class="container under-navbar">
         <div class="container shopping-card">
             <div class="row justify-content-center text-center">
-                <h1>Einkaufslist</h1>
+                <h1>Einkaufsliste</h1>
             </div>
 
             {% for ingredient, value in ingredient_dict.items() %}
@@ -28,13 +28,23 @@
 
         </div>
 
+        <div class="row justify-content-center text-center">
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            {% for message in messages %}
+            <p class="success">{{ message }}</p>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+        </div>
+
         <div class="row">
             <div class="col-6 text-start">
-                <a class="btn btn-success" href="{{ url_for('shopping_list') }}" role="button">PDF Herunterladen</a>
+                <a class="btn btn-success" href="{{ url_for('gen_pdf_shopping_list', data=data) }}" role="button">PDF Herunterladen</a>
             </div>
 
             <div class="col-6 text-end">
-                <a class="btn btn-success" href="{{ url_for('shopping_list') }}" role="button">Teilen</a>
+                <a class="btn btn-success" href="{{ url_for('share_shopping_list', data=data) }}" role="button">Teilen</a>
             </div>
         </div>   
     </div>
